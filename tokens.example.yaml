@@ -1,0 +1,23 @@
+# 访问控制（复制为 tokens.yaml 后修改；tokens.yaml 不入库）
+# 保存即生效，无需重启。改坏了（YAML 错误、引用了不存在的 scope）会继续使用上一版有效配置。
+#
+# 生成 token：python -m wiki_mcp token-new 张三 --scopes 技术公共,项目A
+#   明文 token 只显示一次，直接发给对方；这里只存它的 sha256。
+# 核对权限：python -m wiki_mcp check   /   python -m wiki_mcp preview 张三
+
+# scope = 一组目录（相对知识库根目录，按目录逐级匹配）。"." 表示整个知识库。
+scopes:
+  技术公共:
+    - work/技术文档
+    - work/代码
+  项目A:
+    - work/项目/20260101-项目A
+
+users:
+  - name: 张三
+    token_sha256: 0000000000000000000000000000000000000000000000000000000000000000
+    scopes: [技术公共, 项目A]
+  - name: 李四
+    token_sha256: 1111111111111111111111111111111111111111111111111111111111111111
+    scopes: [技术公共]
+    # disabled: true   # 吊销：设为 true 或直接删除这一项

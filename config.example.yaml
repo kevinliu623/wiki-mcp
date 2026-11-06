@@ -1,0 +1,55 @@
+# wiki-mcp 服务配置（复制为 config.yaml 后修改；config.yaml 不入库）
+# 修改本文件需要重启；权限（scopes / users）在 tokens.yaml，改完即时生效。
+# 相对路径均相对于本文件所在目录。
+
+# 知识库类型：obsidian（[[wikilink]] + Markdown 链接）| markdown（普通 Markdown 文件夹）
+backend: obsidian
+root: D:/notes/my-vault
+
+# 监听地址：默认只监听本机。给同事用时改成本机的内网 IP（不建议 0.0.0.0）。
+host: 127.0.0.1
+port: 8765
+# 同事访问时使用的其他主机名 / IP（用于 Host 头校验，防 DNS rebinding）。
+# 监听 0.0.0.0 或放在反向代理之后时必须填写。
+allowed_hosts: []
+
+# HTTPS：两项同时配置即启用。也可以保持 HTTP、在前面放一个 HTTPS 反向代理。
+# tls_certfile: certs/server.crt
+# tls_keyfile: certs/server.key
+
+access_file: tokens.yaml
+log_file: logs/access.jsonl
+
+# 硬排除：优先于任何授权，写错 tokens.yaml 也看不到。
+#   不含 "/" 的条目：匹配任意层级的同名目录/文件（如 _templates）
+#   含 "/" 的条目：从根目录起的路径前缀（如 work/日报）
+#   以 "." 开头的目录/文件（.obsidian、.git、.trash …）始终排除，无需列出
+exclude:
+  - personal
+  - _templates
+  - _attachments
+
+# 冻结目录：内容仍可访问，但每条结果都会标注 frozen_note
+frozen: []
+frozen_note: 遗留参考，可能过时
+
+# frontmatter 字段名
+status_field: status   # 结果里展示的状态
+share_field: share     # 写 share: false 的笔记对所有人隐藏
+
+# 每个用户每分钟的工具调用上限
+rate_limit_per_minute: 60
+
+# 本机管理页面端口（始终只监听 127.0.0.1，同事访问不到）；0 表示不启用
+admin_port: 8766
+
+# 单次返回的上限（防止撑爆调用方 agent 的上下文）
+limits:
+  read_chars: 12000
+  search_results: 10
+  snippets_per_doc: 2
+  snippet_chars: 160
+  index_entries: 200
+  recent_results: 50
+  related_links: 20
+  max_query_chars: 200

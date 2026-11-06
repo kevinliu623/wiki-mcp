@@ -1,57 +1,80 @@
 # wiki-mcp
 
-> 把你的个人 Obsidian / Markdown 知识库，变成同事 AI agent 可以查询、可以投递需求的只读 MCP 服务。
+> 把你的个人 Obsidian / Markdown 知识库，变成同事 AI agent 可以按权限查询的只读 MCP 服务。
 >
-> Turn your personal Obsidian / Markdown knowledge base into a read-only MCP service that teammates' AI agents can query — and drop requests into.
+> Turn your personal Obsidian / Markdown knowledge base into a read-only, permission-scoped MCP service that teammates' AI agents can query.
 
 **为什么做这个**：个人知识库里的设计决策、技术文档、项目进度，同事的 agent 用不上——要么给你发消息问，要么干脆不知道有。wiki-mcp 把知识库原样封一层 MCP：**知识库保持你自己的习惯维护，同事的 agent 按权限查询**。文件就是活文件，你刚写完的内容立刻可查，没有任何同步环节。
 
 ## 特性
 
-- **8 个只读为主的安全工具**，单次返回服务端封顶，防止把 agent 上下文撑爆：
+- **4 个只读工具**，单次返回服务端封顶，防止把 agent 上下文撑爆：
 
 | 工具 | 说明 |
 |---|---|
-| `wiki_search(query)` | 词法检索，返回文件名+命中片段，永不整页 |
-| `wiki_read(path)` | 读文件（超长自动截断为头部+区间说明） |
-| `wiki_index()` | 知识库两级目录树 + 入口索引摘要 |
-| `wiki_questions(query)` | 已沉淀问答检索 |
-| `wiki_recent(days)` | 最近 N 天修改的笔记（进度类问题的直接答案） |
-| `wiki_related(path)` | 沿 [[wikilink]] 列出关联笔记，agent 可顺藤摸瓜 |
-| `wiki_ask(question)` | 查不到时把问题投进你的收件箱——你看到的是「大家想知道什么」 |
-| `inbox_write(title, content)` | 需求投放：服务端控制落盘路径，带写者身份留痕 |
+| `wiki_search(query, limit)` | 词法检索（多词需全部命中），返回路径 + 修改时间/状态 + 命中片段，永不整页 |
+| `wiki_read(path, offset)` | 读全文；`path` 可只写标题；超长分段续读；首段附过滤后的出链/反链 |
+| `wiki_index(path)` | 按权限动态生成的两级目录树（含各目录篇数） |
+| `wiki_recent(days, limit)` | 最近 N 天修改的笔记（"最近进展"类问题的直接答案） |
 
-- **按 token 的目录级权限（default-deny）**：一个 YAML 文件管理所有同事，一行一个人，`allow` 列出他能看的目录前缀；搜索、目录树、最近修改**全部按 token 过滤**——受限的人连搜都搜不出范围外的内容
-- **唯一写入口 `inbox_write`**：只认服务端生成的路径（`_inbox/<人名>/<时间戳>-<标题>.md`），不能指定路径、不能覆盖他人文件、带大小与频次上限
-- **硬编码排除区**：`personal/` 类目录对所有人不可见（配置写错也进不去，防呆）
-- **tokens.yaml 热加载**：加人、改权限、吊销，改完即生效不重启
-- **访问日志**：谁在何时查了什么（JSONL 追加），审计兼兴趣信号——哪些文档被同事高频查看
+- **按 token 的目录级权限（default-deny）**：`tokens.yaml` 定义 scope（一组目录），每个人分配若干 scope；列表、搜索、目录树、最近修改、关联笔记**全部按 token 过滤**
+- **不泄漏受限内容的名字**：可见笔记里指向受限/不存在笔记的链接与嵌入替换为 `〔未公开链接〕`；检索在替换后的文本上进行，无法通过搜索探测受限笔记名；"无权访问"与"不存在"返回同一句话
+- **硬排除区**：配置的 `exclude` 目录与所有 `.xxx` 隐藏目录对任何人不可见（scope 写错也进不去）；单篇笔记 frontmatter 写 `share: false` 即对所有人隐藏
+- **结果带时效**：每条结果附最后修改时间与 frontmatter 状态；冻结目录标注"遗留参考，可能过时"
+- **tokens.yaml 热加载**：加人、改权限、吊销，保存即生效；改坏了继续使用上一版有效配置；只存 token 的 sha256
+- **访问日志**：每次调用一行 JSONL（时间、用户、IP、工具、参数摘要、结果、耗时），含鉴权失败与越权
 - **零后台、零数据库**：直接读 Markdown 文件，不需要 Obsidian 运行，不需要向量库
+- **多种知识库类型**：后端插件化，当前支持 `obsidian`、`markdown`（普通 Markdown 文件夹）
+- **本机管理页面**：新建同事、勾选目录授权、停用 / 重置 token、以某人身份预览、查看访问记录；生成 token 时一键复制"发给对方的接入说明"（含 MCP 配置与建议提示词）
 
 ## 架构
 
 ```
 同事的 agent（带各自 Bearer token）
-        │  http://<内网IP>:8765/mcp
+        │  http(s)://<内网IP>:8765/mcp
         ▼
-   server.py（FastMCP / streamable HTTP）
-        │  ① 查 tokens.yaml：token → {name, allow[], inbox}
-        │  ② 每个工具调用先过权限，搜索也按 token 过滤
-        │  ③ personal/ 硬排除，写入只落 _inbox/
+   BearerAuthMiddleware ── 无效 token → 401（记日志）
         ▼
-   直接读你的 Markdown 知识库（活文件，无同步）
+   MCPServer（streamable HTTP，Host/Origin 校验，按用户限频）
+        │  4 个只读工具 → WikiService
+        ▼
+   WikiService：可见性（硬排除 → share:false → scope）+ 链接脱敏 + 返回预算
+        ▼
+   Backend（obsidian / markdown）：列举、读取、解析 frontmatter 与链接
+        ▼
+   你的 Markdown 知识库（活文件，无同步）
 ```
 
 ## 快速开始
 
 ```bash
-# 1. 安装
-pip install "mcp[cli]" pyyaml
-# （Windows：配合 start.bat 设置 PYTHONUTF8=1 启动）
+# 1. 安装（Python ≥ 3.10）
+python -m venv .venv
+.venv/Scripts/pip install -e .          # Linux/macOS: .venv/bin/pip
 
-# 2. 配置 tokens.yaml（从 tokens.example.yaml 复制）
-# 3. 启动
-python server.py
+# 2. 配置
+cp config.example.yaml config.yaml      # 改 root、exclude、host
+cp tokens.example.yaml tokens.yaml      # 定义 scopes
+
+# 3. 启动（Windows 可直接运行 start.bat）
+python -m wiki_mcp serve --open          # --open：同时在浏览器打开管理页面
+```
+
+启动日志会打印**管理页面**链接（`http://127.0.0.1:8766/#key=…`，只有本机能访问）。在页面上：
+
+- **新建同事**：填名字 → 勾选能看的目录或已有范围 → 生成 token，复制"发给对方的完整说明"私下发给他
+- **编辑权限 / 停用 / 重置 token / 删除**：保存即生效，无需重启
+- **预览**：以某人的身份看目录、试检索，核对权限是否符合预期
+- **访问记录**：谁、何时、查了什么，可只看越权 / 认证失败等异常
+
+忘了链接：双击 `admin.bat`，或运行 `python -m wiki_mcp admin-url --open`。
+
+也可以不用页面，直接编辑 `tokens.yaml` 或用命令行：
+
+```bash
+python -m wiki_mcp token-new 张三 --scopes 技术公共,项目A   # 输出 token 和要粘进 tokens.yaml 的片段
+python -m wiki_mcp check                                   # 各 scope / 用户可见篇数、可疑配置
+python -m wiki_mcp preview 张三 --search "部署"             # 以张三身份检索
 ```
 
 同事接入：在他们的 MCP 客户端（Claude Code / Codex / Cursor 等）配置里加：
@@ -60,6 +83,7 @@ python server.py
 {
   "mcpServers": {
     "wiki": {
+      "type": "http",
       "url": "http://<内网IP>:8765/mcp",
       "headers": { "Authorization": "Bearer <token>" }
     }
@@ -69,23 +93,36 @@ python server.py
 
 ## 安全模型
 
-- **default-deny**：token 没给的目录，读、搜、列、最近修改全部不可见
-- **硬排除**：`deny` 目录优先于一切配置（写错配置也进不去）
-- **写入面最小化**：仅一个 `inbox_write`，路径服务端生成、身份留痕、限大小限频次
-- **全量审计**：每个工具调用记访问日志（时间、token 名、工具、参数摘要、是否越权被拒）
-- **返回预算**：单次调用返回内容封顶，防止 agent 上下文被撑爆
+- **default-deny**：token 没授权的目录，读、搜、列、最近修改、关联笔记全部不可见
+- **判定顺序**：硬排除 → `share: false` → scope 前缀（按目录逐级匹配，`项目/2026` 不会匹配 `项目/20260101-x`）
+- **路径安全**：只提供扫描得到的 `.md` 文件，不按用户输入拼文件路径；不跟随符号链接与 junction
+- **传输**：默认只监听 `127.0.0.1`；监听 `0.0.0.0` 必须配置 `allowed_hosts`；开启 Host/Origin 校验防 DNS rebinding；明文 HTTP 对外时启动告警，建议配置 `tls_certfile/tls_keyfile` 或置于 HTTPS 反向代理之后
+- **凭据**：`tokens.yaml` 只存 sha256；`config.yaml`、`tokens.yaml`、日志均不入库
+- **限频与审计**：每用户每分钟调用上限；所有调用、鉴权失败与管理操作写访问日志（不记录明文 token）
+- **管理页面**：只监听 `127.0.0.1`、独立端口；所有接口需要 `X-Admin-Key` 请求头（跨站网页无法伪造，防 CSRF），校验 Host 头；严格 CSP；口令保存在 `tokens.yaml` 旁的 `.admin_key`（不入库）
+- **已知边界**：只隐藏*链接*，不隐藏正文里的普通文字提及（包括代码块里的文字）；附件（图片/PDF）不提供，但附件链接文字保持原样
+
+## 开发
+
+```bash
+.venv/Scripts/pip install -e ".[dev]"
+.venv/Scripts/python -m pytest              # 全部测试（含真实 HTTP 端到端）
+.venv/Scripts/python -m pytest tests/test_service.py -k search
+```
+
+设计决策与讨论记录见 [docs/design.md](docs/design.md)。
 
 ## Roadmap
 
-- [ ] v1.x 语义检索（分词/embedding，词法不够用时）
-- [ ] v1.x 投递回执（写者可查自己投递的处理状态）
-- [ ] v1.x 投递通知（本机弹窗 / 推送）
-- [ ] v1.x 项目概览聚合（设计+进度+最近变化打包为一段上下文）
-- [ ] 首个可用版本
+- [x] v0.1 只读查询：4 个工具、scope 权限、链接脱敏、热加载、审计、限频、本机管理页面
+- [ ] 需求投递（按项目收件箱 + 定时扫描确认，见 design.md D1）
+- [ ] wiki 汇总层按页面 `projects:` 字段授权
+- [ ] 更多后端：Logseq、思源笔记
+- [ ] 语义检索（分词/embedding，词法不够用时）
 
 ## Contributing
 
-欢迎 issue 和 PR——这是个大伙一起把它做好的项目：接入你手头的 MCP 客户端、报告检索盲区、贡献搜索改进都非常有价值。
+欢迎 issue 和 PR——接入你手头的 MCP 客户端、报告检索盲区、贡献新的知识库后端都非常有价值。新后端只需实现 `wiki_mcp/backends/base.py` 的 `Backend` 接口。
 
 ## License
 
