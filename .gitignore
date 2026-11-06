@@ -1,0 +1,17 @@
+# ---- 凭据与本地敏感配置（绝不入库）----
+tokens.yaml
+access_log*.jsonl
+logs/
+*.log
+
+# ---- 本地接入说明（含内网 IP）----
+onboarding-local.*
+
+# ---- Python ----
+__pycache__/
+*.pyc
+.venv/
+
+# ---- OS ----
+Thumbs.db
+.DS_Store
