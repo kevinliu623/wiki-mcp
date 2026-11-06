@@ -1,5 +1,7 @@
 # ---- 凭据与本地敏感配置（绝不入库）----
 tokens.yaml
+config.yaml
+certs/
 access_log*.jsonl
 logs/
 *.log
@@ -11,6 +13,9 @@ onboarding-local.*
 __pycache__/
 *.pyc
 .venv/
+*.egg-info/
+build/
+.pytest_cache/
 
 # ---- OS ----
 Thumbs.db
