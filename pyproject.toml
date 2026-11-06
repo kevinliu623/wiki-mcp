@@ -24,6 +24,9 @@ wiki-mcp = "wiki_mcp.__main__:main"
 [tool.setuptools.packages.find]
 include = ["wiki_mcp*"]
 
+[tool.setuptools.package-data]
+wiki_mcp = ["admin_page.html"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

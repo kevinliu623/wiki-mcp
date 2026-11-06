@@ -1,6 +1,7 @@
 """Command line: ``python -m wiki_mcp <command>``.
 
-serve      启动 MCP 服务
+serve      启动 MCP 服务（同时在本机启动管理页面）
+admin-url  打印 / 打开管理页面链接
 token-new  生成一个新 token（明文只显示这一次），输出可粘贴进 tokens.yaml 的片段
 check      校验 config.yaml + tokens.yaml，报告各 scope / 用户可见的笔记数与可疑配置
 preview    以某个用户的身份查看目录树 / 检索，用来核对权限是否符合预期
@@ -26,7 +27,22 @@ def _service(cfg):
 def cmd_serve(args) -> int:
     from .server import serve
 
-    serve(load_config(args.config))
+    serve(load_config(args.config), open_admin=args.open)
+    return 0
+
+
+def cmd_admin_url(args) -> int:
+    from .admin import admin_key, admin_key_path, admin_url
+
+    cfg = load_config(args.config)
+    if not cfg.admin_port:
+        print("config.yaml 中 admin_port 为 0，管理页面未启用", file=sys.stderr)
+        return 2
+    url = admin_url(cfg.admin_port, admin_key(admin_key_path(cfg.access_file)))
+    print(url)
+    if args.open:
+        import webbrowser
+        webbrowser.open(url)
     return 0
 
 
@@ -106,7 +122,13 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("serve", help="启动服务")
     p.add_argument("-c", "--config", default="config.yaml")
+    p.add_argument("--open", action="store_true", help="启动后在浏览器打开管理页面")
     p.set_defaults(fn=cmd_serve)
+
+    p = sub.add_parser("admin-url", help="打印管理页面链接")
+    p.add_argument("-c", "--config", default="config.yaml")
+    p.add_argument("--open", action="store_true", help="在浏览器打开")
+    p.set_defaults(fn=cmd_admin_url)
 
     p = sub.add_parser("token-new", help="生成新 token")
     p.add_argument("name")

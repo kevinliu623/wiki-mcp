@@ -25,6 +25,7 @@
 - **访问日志**：每次调用一行 JSONL（时间、用户、IP、工具、参数摘要、结果、耗时），含鉴权失败与越权
 - **零后台、零数据库**：直接读 Markdown 文件，不需要 Obsidian 运行，不需要向量库
 - **多种知识库类型**：后端插件化，当前支持 `obsidian`、`markdown`（普通 Markdown 文件夹）
+- **本机管理页面**：新建同事、勾选目录授权、停用 / 重置 token、以某人身份预览、查看访问记录；生成 token 时一键复制"发给对方的接入说明"（含 MCP 配置与建议提示词）
 
 ## 架构
 
@@ -55,16 +56,25 @@ python -m venv .venv
 cp config.example.yaml config.yaml      # 改 root、exclude、host
 cp tokens.example.yaml tokens.yaml      # 定义 scopes
 
-# 3. 给同事发 token（明文只显示一次，把输出的片段粘进 tokens.yaml）
-python -m wiki_mcp token-new 张三 --scopes 技术公共,项目A
+# 3. 启动（Windows 可直接运行 start.bat）
+python -m wiki_mcp serve --open          # --open：同时在浏览器打开管理页面
+```
 
-# 4. 核对权限
-python -m wiki_mcp check                 # 各 scope / 用户可见篇数、可疑配置
-python -m wiki_mcp preview 张三          # 以张三身份看目录树
-python -m wiki_mcp preview 张三 --search "部署"
+启动日志会打印**管理页面**链接（`http://127.0.0.1:8766/#key=…`，只有本机能访问）。在页面上：
 
-# 5. 启动（Windows 可直接运行 start.bat）
-python -m wiki_mcp serve
+- **新建同事**：填名字 → 勾选能看的目录或已有范围 → 生成 token，复制"发给对方的完整说明"私下发给他
+- **编辑权限 / 停用 / 重置 token / 删除**：保存即生效，无需重启
+- **预览**：以某人的身份看目录、试检索，核对权限是否符合预期
+- **访问记录**：谁、何时、查了什么，可只看越权 / 认证失败等异常
+
+忘了链接：双击 `admin.bat`，或运行 `python -m wiki_mcp admin-url --open`。
+
+也可以不用页面，直接编辑 `tokens.yaml` 或用命令行：
+
+```bash
+python -m wiki_mcp token-new 张三 --scopes 技术公共,项目A   # 输出 token 和要粘进 tokens.yaml 的片段
+python -m wiki_mcp check                                   # 各 scope / 用户可见篇数、可疑配置
+python -m wiki_mcp preview 张三 --search "部署"             # 以张三身份检索
 ```
 
 同事接入：在他们的 MCP 客户端（Claude Code / Codex / Cursor 等）配置里加：
@@ -88,7 +98,8 @@ python -m wiki_mcp serve
 - **路径安全**：只提供扫描得到的 `.md` 文件，不按用户输入拼文件路径；不跟随符号链接与 junction
 - **传输**：默认只监听 `127.0.0.1`；监听 `0.0.0.0` 必须配置 `allowed_hosts`；开启 Host/Origin 校验防 DNS rebinding；明文 HTTP 对外时启动告警，建议配置 `tls_certfile/tls_keyfile` 或置于 HTTPS 反向代理之后
 - **凭据**：`tokens.yaml` 只存 sha256；`config.yaml`、`tokens.yaml`、日志均不入库
-- **限频与审计**：每用户每分钟调用上限；所有调用与鉴权失败写访问日志
+- **限频与审计**：每用户每分钟调用上限；所有调用、鉴权失败与管理操作写访问日志（不记录明文 token）
+- **管理页面**：只监听 `127.0.0.1`、独立端口；所有接口需要 `X-Admin-Key` 请求头（跨站网页无法伪造，防 CSRF），校验 Host 头；严格 CSP；口令保存在 `tokens.yaml` 旁的 `.admin_key`（不入库）
 - **已知边界**：只隐藏*链接*，不隐藏正文里的普通文字提及（包括代码块里的文字）；附件（图片/PDF）不提供，但附件链接文字保持原样
 
 ## 开发
@@ -103,7 +114,7 @@ python -m wiki_mcp serve
 
 ## Roadmap
 
-- [x] v0.1 只读查询：4 个工具、scope 权限、链接脱敏、热加载、审计、限频
+- [x] v0.1 只读查询：4 个工具、scope 权限、链接脱敏、热加载、审计、限频、本机管理页面
 - [ ] 需求投递（按项目收件箱 + 定时扫描确认，见 design.md D1）
 - [ ] wiki 汇总层按页面 `projects:` 字段授权
 - [ ] 更多后端：Logseq、思源笔记

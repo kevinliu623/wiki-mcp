@@ -51,11 +51,22 @@ class Config:
     status_field: str = "status"
     share_field: str = "share"
     rate_limit_per_minute: int = 60
+    admin_port: int = 8766           # local admin page, always bound to 127.0.0.1; 0 disables
     limits: Limits = field(default_factory=Limits)
 
     @property
     def scheme(self) -> str:
         return "https" if self.tls_certfile else "http"
+
+    @property
+    def public_url(self) -> str:
+        """The MCP URL colleagues should use."""
+        host = self.host
+        if host in ("0.0.0.0", "::"):
+            host = self.allowed_hosts[0] if self.allowed_hosts else "127.0.0.1"
+        if ":" in host and not host.startswith("["):
+            host = f"[{host}]"
+        return f"{self.scheme}://{host}:{self.port}/mcp"
 
 
 _TOP_KEYS = {f.name for f in fields(Config)}
@@ -106,6 +117,7 @@ def load_config(path: str | Path) -> Config:
     cfg.allowed_hosts = [str(x) for x in (cfg.allowed_hosts or [])]
     cfg.port = int(cfg.port)
     cfg.rate_limit_per_minute = int(cfg.rate_limit_per_minute)
+    cfg.admin_port = int(cfg.admin_port)
     validate(cfg)
     return cfg
 
@@ -124,6 +136,8 @@ def validate(cfg: Config) -> None:
             "监听所有网卡（0.0.0.0 / ::）时必须配置 allowed_hosts（同事访问时使用的 IP 或域名），"
             "否则无法做 Host 校验。建议改为监听具体的内网 IP。"
         )
+    if cfg.admin_port and (cfg.admin_port == cfg.port or not 0 < cfg.admin_port < 65536):
+        raise ConfigError("admin_port 必须是 1–65535 且不同于 port（0 表示不启用管理页面）")
     if cfg.rate_limit_per_minute <= 0:
         raise ConfigError("rate_limit_per_minute 必须为正数")
     for f in fields(Limits):

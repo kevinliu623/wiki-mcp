@@ -184,8 +184,10 @@ def build_app(c: Components):
     return BearerAuthMiddleware(inner, c.access, c.log)
 
 
-def serve(cfg: Config) -> None:
+def serve(cfg: Config, open_admin: bool = False) -> None:
     import uvicorn
+
+    from .admin import admin_key, admin_key_path, admin_url, start_admin_thread
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     c = build_components(cfg)
@@ -197,6 +199,13 @@ def serve(cfg: Config) -> None:
     logger.info("MCP 地址：%s://%s:%d/mcp", cfg.scheme, cfg.host, cfg.port)
     if cfg.scheme == "http" and cfg.host not in ("127.0.0.1", "localhost", "::1"):
         logger.warning("正在用明文 HTTP 对外提供服务：token 在网络上可被嗅探。建议配置 tls_certfile/tls_keyfile 或置于 HTTPS 反向代理之后。")
+    if cfg.admin_port:
+        url = admin_url(cfg.admin_port, admin_key(admin_key_path(cfg.access_file)))
+        start_admin_thread(c, admin_key(admin_key_path(cfg.access_file)))
+        logger.info("管理页面（仅本机可访问）：%s", url)
+        if open_admin:
+            import webbrowser
+            webbrowser.open(url)
     uvicorn.run(
         app,
         host=cfg.host,

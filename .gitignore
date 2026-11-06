@@ -1,5 +1,7 @@
 # ---- 凭据与本地敏感配置（绝不入库）----
 tokens.yaml
+tokens.yaml.tmp
+.admin_key
 config.yaml
 certs/
 access_log*.jsonl

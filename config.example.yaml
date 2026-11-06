@@ -40,6 +40,9 @@ share_field: share     # 写 share: false 的笔记对所有人隐藏
 # 每个用户每分钟的工具调用上限
 rate_limit_per_minute: 60
 
+# 本机管理页面端口（始终只监听 127.0.0.1，同事访问不到）；0 表示不启用
+admin_port: 8766
+
 # 单次返回的上限（防止撑爆调用方 agent 的上下文）
 limits:
   read_chars: 12000

@@ -166,6 +166,13 @@ class AccessStore:
                     self.last_error = f"{self.path} 重新加载失败，继续使用上一版有效配置：{e}"
             return self._table
 
+    def reload(self) -> None:
+        """Force a re-read now (used after the admin page writes the file)."""
+        with self._lock:
+            self._table = load_access(self.path)
+            self._stamp = self._current_stamp()
+            self.last_error = None
+
     def authenticate(self, token: str | None) -> User | None:
         if not token:
             return None

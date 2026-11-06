@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>wiki-mcp 管理</title>
+<style nonce="__NONCE__">
+:root {
+  --bg: #f6f7f9; --panel: #fff; --text: #1d2330; --muted: #6b7385; --line: #e3e6ec;
+  --accent: #2f6fde; --accent-weak: #e8f0fd; --danger: #c73a3a; --danger-weak: #fdecec;
+  --ok: #1f8a4c; --ok-weak: #e6f5ec; --warn: #a86400; --warn-weak: #fff4e0; --code: #f1f3f6;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171c; --panel: #1c2027; --text: #e6e9ef; --muted: #98a0b0; --line: #2c323c;
+    --accent: #6c9cf0; --accent-weak: #1f2a3d; --danger: #f07171; --danger-weak: #3a2024;
+    --ok: #5fcf8f; --ok-weak: #1b3326; --warn: #f0b35c; --warn-weak: #3a2e1a; --code: #23272f;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.55 -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif; }
+header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 14px 24px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+header h1 { font-size: 17px; margin: 0; font-weight: 650; }
+.addr { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.addr code { color: var(--text); }
+nav { display: flex; gap: 4px; padding: 0 24px; background: var(--panel); border-bottom: 1px solid var(--line); }
+nav button { border: 0; background: none; padding: 10px 14px; color: var(--muted); cursor: pointer;
+  border-bottom: 2px solid transparent; font: inherit; }
+nav button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+main { padding: 20px 24px 60px; max-width: 1200px; }
+.banner { margin: 0 0 14px; padding: 10px 14px; border-radius: 8px; }
+.banner.warn { background: var(--warn-weak); color: var(--warn); }
+.banner.err { background: var(--danger-weak); color: var(--danger); }
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.toolbar .grow { flex: 1; }
+table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 10px; overflow: hidden; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; color: var(--muted); font-size: 13px; background: var(--panel); }
+tr:last-child td { border-bottom: 0; }
+td.actions { white-space: nowrap; }
+.chip { display: inline-block; padding: 1px 8px; margin: 1px 4px 1px 0; border-radius: 999px;
+  background: var(--accent-weak); color: var(--accent); font-size: 12.5px; }
+.tag { display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: 12.5px; }
+.tag.ok { background: var(--ok-weak); color: var(--ok); }
+.tag.off { background: var(--code); color: var(--muted); }
+.tag.bad { background: var(--danger-weak); color: var(--danger); }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+button.btn { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--text);
+  padding: 5px 11px; border-radius: 7px; cursor: pointer; }
+button.btn:hover { border-color: var(--accent); }
+button.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.btn.danger { color: var(--danger); }
+button.btn.link { border: 0; background: none; color: var(--accent); padding: 4px 6px; }
+button.btn.link.danger { color: var(--danger); }
+input[type=text], input[type=search], select { font: inherit; padding: 6px 10px; border: 1px solid var(--line);
+  border-radius: 7px; background: var(--panel); color: var(--text); min-width: 0; }
+input[type=text]:focus, input[type=search]:focus { outline: 2px solid var(--accent-weak); border-color: var(--accent); }
+dialog { border: 1px solid var(--line); border-radius: 12px; padding: 0; width: min(760px, 94vw);
+  background: var(--panel); color: var(--text); box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+dialog::backdrop { background: rgba(10, 14, 22, .45); }
+.dlg-head { padding: 14px 18px; border-bottom: 1px solid var(--line); font-weight: 650; font-size: 15px; }
+.dlg-body { padding: 16px 18px; max-height: 70vh; overflow: auto; }
+.dlg-foot { padding: 12px 18px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; }
+.field { margin-bottom: 14px; }
+.field > label { display: block; font-weight: 600; margin-bottom: 6px; }
+.field .hint { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+.checks label { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; cursor: pointer; }
+.tree { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; max-height: 320px; overflow: auto; }
+.tree ul { list-style: none; margin: 0; padding-left: 18px; }
+.tree > ul { padding-left: 0; }
+.tree li { padding: 1px 0; }
+.tree .row { display: flex; align-items: center; gap: 4px; }
+.tree .tog { width: 18px; border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0; font: inherit; }
+.tree label { cursor: pointer; display: flex; gap: 6px; align-items: center; }
+pre { background: var(--code); padding: 10px 12px; border-radius: 8px; white-space: pre-wrap; word-break: break-all;
+  margin: 6px 0 0; font: 12.5px/1.5 Consolas, "Cascadia Mono", Menlo, monospace; max-height: 340px; overflow: auto; }
+.copyblock { margin-bottom: 14px; }
+.copyblock .top { display: flex; align-items: center; justify-content: space-between; }
+.copyblock .top b { font-weight: 600; }
+#toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #222a; color: #fff;
+  padding: 8px 16px; border-radius: 8px; backdrop-filter: blur(4px); }
+.empty { padding: 30px; text-align: center; color: var(--muted); background: var(--panel);
+  border: 1px dashed var(--line); border-radius: 10px; }
+.mono { font-family: Consolas, "Cascadia Mono", Menlo, monospace; font-size: 12.5px; }
+@media (max-width: 720px) {
+  header, nav, main { padding-left: 12px; padding-right: 12px; }
+  td, th { padding: 7px 8px; }
+  .hide-sm { display: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>wiki-mcp 管理</h1>
+  <div class="addr">MCP 地址 <code id="mcp-url">…</code> <button class="btn link" id="copy-url">复制</button></div>
+  <div class="addr small" id="root"></div>
+</header>
+<nav>
+  <button data-tab="users" class="active">同事</button>
+  <button data-tab="scopes">权限范围</button>
+  <button data-tab="log">访问记录</button>
+</nav>
+<main>
+  <div id="banners"></div>
+  <section id="tab-users"></section>
+  <section id="tab-scopes" hidden></section>
+  <section id="tab-log" hidden></section>
+</main>
+<dialog id="dlg"><div class="dlg-head" id="dlg-title"></div><div class="dlg-body" id="dlg-body"></div><div class="dlg-foot" id="dlg-foot"></div></dialog>
+<div id="toast" hidden></div>
+
+<script nonce="__NONCE__">
+"use strict";
+// ---------------------------------------------------------------- key & api
+const KEY = (() => {
+  let k = "";
+  const m = location.hash.match(/key=([^&]+)/);
+  if (m) { k = decodeURIComponent(m[1]); history.replaceState(null, "", location.pathname); }
+  try { if (k) sessionStorage.setItem("wiki-admin-key", k); else k = sessionStorage.getItem("wiki-admin-key") || ""; } catch (e) {}
+  return k;
+})();
+
+async function api(method, path, body) {
+  const res = await fetch(path, {
+    method, headers: { "X-Admin-Key": KEY, "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  let data = {};
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok) throw new Error(data.error || ("请求失败：" + res.status));
+  return data;
+}
+
+// ---------------------------------------------------------------- dom helpers
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === undefined || v === null || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k === "text") el.textContent = v;
+    else if (k in el && typeof v !== "string") el[k] = v;
+    else el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false)
+    el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+  return el;
+}
+const $ = (sel) => document.querySelector(sel);
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast._t); toast._t = setTimeout(() => { t.hidden = true; }, 2200);
+}
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) {
+    const ta = h("textarea", {}); ta.value = text; document.body.append(ta); ta.select();
+    document.execCommand("copy"); ta.remove();
+  }
+  toast("已复制");
+}
+function guard(fn) {
+  return async (...a) => { try { await fn(...a); } catch (e) { alert(e.message); } };
+}
+
+// ---------------------------------------------------------------- dialog
+const dlg = $("#dlg");
+function openDialog(title, body, buttons) {
+  $("#dlg-title").textContent = title;
+  $("#dlg-body").replaceChildren(body);
+  $("#dlg-foot").replaceChildren(...buttons);
+  if (!dlg.open) dlg.showModal();
+}
+function closeDialog() { dlg.close(); }
+const cancelBtn = (label = "取消") => h("button", { class: "btn", onclick: closeDialog }, label);
+
+// ---------------------------------------------------------------- state
+let S = { users: [], scopes: [] };
+let TREE = [];
+
+async function refresh() {
+  S = await api("GET", "/api/state");
+  TREE = (await api("GET", "/api/tree")).dirs;
+  $("#mcp-url").textContent = S.mcp_url;
+  $("#root").textContent = "知识库：" + S.root;
+  const banners = [];
+  if (S.error) banners.push(h("div", { class: "banner err" }, "tokens.yaml 有错误，服务仍在使用上一版有效配置：" + S.error));
+  if (S.plain_http) banners.push(h("div", { class: "banner warn" },
+    "当前用明文 HTTP 对局域网提供服务，token 在网络上可被嗅探。长期多人使用建议启用 HTTPS。"));
+  $("#banners").replaceChildren(...banners);
+  renderUsers(); renderScopes();
+}
+
+// ---------------------------------------------------------------- directory tree picker
+function buildTree() {
+  const nodes = new Map();
+  const root = { path: "", name: "", children: [], count: 0 };
+  for (const d of TREE) {
+    const parts = d.path.split("/");
+    nodes.set(d.path, { path: d.path, name: parts[parts.length - 1], count: d.count, children: [] });
+  }
+  for (const n of nodes.values()) {
+    const parent = n.path.includes("/") ? nodes.get(n.path.slice(0, n.path.lastIndexOf("/"))) : root;
+    (parent || root).children.push(n);
+  }
+  const sort = (n) => { n.children.sort((a, b) => a.name.localeCompare(b.name, "zh")); n.children.forEach(sort); };
+  sort(root);
+  return root;
+}
+
+function treePicker(selected) {
+  const sel = new Set(selected || []);
+  const root = buildTree();
+  const box = h("div", { class: "tree" });
+  const filter = h("input", { type: "search", placeholder: "筛选目录（如：项目名）" });
+  filter.addEventListener("input", () => draw());
+  const open = new Set();
+  // expand the first two levels, plus ancestors of selected dirs
+  const walk = (n, depth) => { if (depth < 2 && n.children.length) open.add(n.path); n.children.forEach(c => walk(c, depth + 1)); };
+  walk(root, 0);
+  for (const p of sel) { const parts = p.split("/"); for (let i = 1; i < parts.length; i++) open.add(parts.slice(0, i).join("/")); }
+
+  function matches(n, q) { return n.path.toLowerCase().includes(q) || n.children.some(c => matches(c, q)); }
+  function draw() {
+    const q = filter.value.trim().toLowerCase();
+    const render = (n) => {
+      const kids = n.children.filter(c => !q || matches(c, q));
+      return h("ul", {}, kids.map(c => {
+        const isOpen = q ? true : open.has(c.path);
+        const cb = h("input", { type: "checkbox", checked: sel.has(c.path),
+          onchange: (e) => { e.target.checked ? sel.add(c.path) : sel.delete(c.path); } });
+        const tog = c.children.length
+          ? h("button", { class: "tog", type: "button", text: isOpen ? "▾" : "▸",
+              onclick: () => { open.has(c.path) ? open.delete(c.path) : open.add(c.path); draw(); } })
+          : h("span", { class: "tog" });
+        return h("li", {},
+          h("div", { class: "row" }, tog, h("label", {}, cb, c.name, h("span", { class: "muted small" }, `（${c.count} 篇）`))),
+          c.children.length && isOpen ? render(c) : null);
+      }));
+    };
+    box.replaceChildren(TREE.length ? render(root) : h("div", { class: "muted" }, "知识库里没有可授权的目录"));
+  }
+  draw();
+  return { el: h("div", {}, h("div", { class: "toolbar" }, filter), box), value: () => [...sel] };
+}
+
+function scopeChecks(selected) {
+  const sel = new Set(selected || []);
+  const el = h("div", { class: "checks" }, S.scopes.length ? S.scopes.map(s =>
+    h("label", {}, h("input", { type: "checkbox", checked: sel.has(s.name),
+        onchange: (e) => { e.target.checked ? sel.add(s.name) : sel.delete(s.name); } }),
+      h("span", {}, h("b", { text: s.name }), h("span", { class: "muted small" }, "　" + s.dirs.join("、") + `（${s.visible} 篇）`))))
+    : h("div", { class: "muted" }, "还没有范围，可以直接在下面勾选目录"));
+  return { el, value: () => [...sel] };
+}
+
+// ---------------------------------------------------------------- users tab
+function renderUsers() {
+  const sec = $("#tab-users");
+  const add = h("button", { class: "btn primary", onclick: () => editUser(null) }, "＋ 新建同事");
+  const bar = h("div", { class: "toolbar" }, h("div", { class: "grow muted" },
+    `共 ${S.users.length} 人。每人一个 token，只能看到授权范围内的笔记。`), add);
+  if (!S.users.length) { sec.replaceChildren(bar, h("div", { class: "empty" }, "还没有同事。点击「新建同事」生成第一个 token。")); return; }
+  const rows = S.users.map(u => h("tr", {},
+    h("td", {}, h("b", { text: u.name })),
+    h("td", {}, u.scopes.map(s => h("span", { class: "chip", title: (S.scopes.find(x => x.name === s) || { dirs: [] }).dirs.join("\n") }, s))),
+    h("td", { class: "hide-sm" }, `${u.visible} 篇`),
+    h("td", {}, u.disabled ? h("span", { class: "tag off" }, "已停用") : h("span", { class: "tag ok" }, "启用")),
+    h("td", { class: "actions" },
+      h("button", { class: "btn link", onclick: () => editUser(u) }, "编辑权限"),
+      h("button", { class: "btn link", onclick: () => previewUser(u) }, "预览"),
+      h("button", { class: "btn link", onclick: guard(() => resetToken(u)) }, "重置 token"),
+      h("button", { class: "btn link", onclick: guard(() => toggleUser(u)) }, u.disabled ? "启用" : "停用"),
+      h("button", { class: "btn link danger", onclick: guard(() => deleteUser(u)) }, "删除"))));
+  sec.replaceChildren(bar, h("table", {},
+    h("thead", {}, h("tr", {}, h("th", {}, "名字"), h("th", {}, "可见范围"), h("th", { class: "hide-sm" }, "可见笔记"),
+      h("th", {}, "状态"), h("th", {}, "操作"))), h("tbody", {}, rows)));
+}
+
+function editUser(u) {
+  const name = h("input", { type: "text", placeholder: "如：张三", value: u ? u.name : "", disabled: !!u });
+  const scopes = scopeChecks(u ? u.scopes : []);
+  const tree = treePicker([]);
+  const body = h("div", {},
+    u ? null : h("div", { class: "field" }, h("label", {}, "名字"), name),
+    h("div", { class: "field" }, h("label", {}, "已有范围"), scopes.el),
+    h("div", { class: "field" }, h("label", {}, "按目录授权"), tree.el,
+      h("div", { class: "hint" }, "勾选的目录会自动建成同名范围（日期前缀会去掉），子目录随父目录一起授权。被排除的目录不会出现在这里。")));
+  const save = h("button", { class: "btn primary", onclick: guard(async () => {
+    if (u) {
+      await api("PATCH", "/api/users/" + encodeURIComponent(u.name), { scopes: scopes.value(), dirs: tree.value() });
+      closeDialog(); toast("已保存，立即生效"); await refresh();
+    } else {
+      const r = await api("POST", "/api/users", { name: name.value, scopes: scopes.value(), dirs: tree.value() });
+      await refresh(); showHandoff(name.value.trim(), r.handoff, "已创建");
+    }
+  }) }, u ? "保存" : "创建并生成 token");
+  openDialog(u ? `编辑权限：${u.name}` : "新建同事", body, [cancelBtn(), save]);
+}
+
+function showHandoff(name, hd, verb) {
+  const block = (title, text, hint) => h("div", { class: "copyblock" },
+    h("div", { class: "top" }, h("b", { text: title }), h("button", { class: "btn", onclick: () => copy(text) }, "复制")),
+    hint ? h("div", { class: "muted small" }, hint) : null, h("pre", { text }));
+  const body = h("div", {},
+    h("div", { class: "banner warn" }, "token 只显示这一次，关闭后无法再查看（丢了可以「重置 token」）。请私下发给对方，不要发到群里或提交进代码仓库。"),
+    block("发给对方的完整说明（推荐）", hd.message, "包含 Claude Code 命令、通用 MCP 配置和建议的提示词"),
+    block("Claude Code 命令", hd.command, "--scope user：token 存在对方的用户配置里，不会进项目仓库"),
+    block("MCP 配置（Cursor 等客户端）", hd.config),
+    block("建议的提示词（放进 CLAUDE.md / Rules）", hd.prompt));
+  openDialog(`${verb}：${name}`, body, [h("button", { class: "btn primary", onclick: closeDialog }, "我已保存，关闭")]);
+}
+
+async function resetToken(u) {
+  if (!confirm(`重置 ${u.name} 的 token？旧 token 会立即失效，需要把新 token 重新发给对方。`)) return;
+  const r = await api("POST", "/api/users/" + encodeURIComponent(u.name) + "/reset-token");
+  await refresh(); showHandoff(u.name, r.handoff, "已重置 token");
+}
+async function toggleUser(u) {
+  await api("PATCH", "/api/users/" + encodeURIComponent(u.name), { disabled: !u.disabled });
+  toast(u.disabled ? "已启用" : "已停用，立即生效"); await refresh();
+}
+async function deleteUser(u) {
+  if (!confirm(`删除 ${u.name}？其 token 立即失效。`)) return;
+  await api("DELETE", "/api/users/" + encodeURIComponent(u.name));
+  toast("已删除"); await refresh();
+}
+
+function previewUser(u) {
+  const out = h("pre", { text: "加载中…" });
+  const path = h("input", { type: "text", placeholder: "目录（留空为根目录）" });
+  const q = h("input", { type: "search", placeholder: "以他的身份检索…" });
+  const run = guard(async (params) => {
+    const sp = new URLSearchParams({ user: u.name, ...params });
+    out.textContent = (await api("GET", "/api/preview?" + sp)).text;
+  });
+  const body = h("div", {},
+    h("div", { class: "muted small" }, "下面就是对方的 AI 能看到的内容（与真实调用同一套权限判断）。"),
+    h("div", { class: "toolbar" }, path, h("button", { class: "btn", onclick: () => run({ path: path.value }) }, "看目录"),
+      q, h("button", { class: "btn", onclick: () => run({ search: q.value }) }, "检索")),
+    out);
+  q.addEventListener("keydown", (e) => { if (e.key === "Enter") run({ search: q.value }); });
+  path.addEventListener("keydown", (e) => { if (e.key === "Enter") run({ path: path.value }); });
+  openDialog(`预览：${u.name} 能看到什么`, body, [cancelBtn("关闭")]);
+  run({ path: "" });
+}
+
+// ---------------------------------------------------------------- scopes tab
+function renderScopes() {
+  const sec = $("#tab-scopes");
+  const add = h("button", { class: "btn primary", onclick: () => editScope(null) }, "＋ 新建范围");
+  const bar = h("div", { class: "toolbar" }, h("div", { class: "grow muted" },
+    "范围 = 一组目录。改动范围的目录，所有用这个范围的人一起生效。"), add);
+  if (!S.scopes.length) { sec.replaceChildren(bar, h("div", { class: "empty" }, "还没有范围。")); return; }
+  const rows = S.scopes.map(s => h("tr", {},
+    h("td", {}, h("b", { text: s.name })),
+    h("td", { class: "mono" }, s.dirs.map(d => h("div", { text: d }))),
+    h("td", {}, s.users.length ? s.users.join("、") : h("span", { class: "muted" }, "无人使用")),
+    h("td", { class: "hide-sm" }, `${s.visible} 篇`),
+    h("td", { class: "actions" },
+      h("button", { class: "btn link", onclick: () => editScope(s) }, "编辑"),
+      h("button", { class: "btn link danger", onclick: guard(() => deleteScope(s)) }, "删除"))));
+  sec.replaceChildren(bar, h("table", {},
+    h("thead", {}, h("tr", {}, h("th", {}, "名称"), h("th", {}, "目录"), h("th", {}, "使用者"),
+      h("th", { class: "hide-sm" }, "笔记"), h("th", {}, "操作"))), h("tbody", {}, rows)));
+}
+
+function editScope(s) {
+  const name = h("input", { type: "text", value: s ? s.name : "", placeholder: "如：技术公共" });
+  const tree = treePicker(s ? s.dirs : []);
+  const body = h("div", {},
+    h("div", { class: "field" }, h("label", {}, "名称"), name, s ? h("div", { class: "hint" }, "改名会同步更新所有使用者") : null),
+    h("div", { class: "field" }, h("label", {}, "包含的目录"), tree.el));
+  const save = h("button", { class: "btn primary", onclick: guard(async () => {
+    if (s) await api("PUT", "/api/scopes/" + encodeURIComponent(s.name), { name: name.value, dirs: tree.value() });
+    else await api("POST", "/api/scopes", { name: name.value, dirs: tree.value() });
+    closeDialog(); toast("已保存，立即生效"); await refresh();
+  }) }, "保存");
+  openDialog(s ? `编辑范围：${s.name}` : "新建范围", body, [cancelBtn(), save]);
+}
+async function deleteScope(s) {
+  if (!confirm(`删除范围「${s.name}」？`)) return;
+  await api("DELETE", "/api/scopes/" + encodeURIComponent(s.name));
+  toast("已删除"); await refresh();
+}
+
+// ---------------------------------------------------------------- log tab
+const OUTCOME = { ok: ["ok", "成功"], not_found: ["off", "未找到"], denied: ["bad", "越权被拒"],
+  bad_request: ["off", "参数错误"], rate_limited: ["bad", "限频"], error: ["bad", "出错"],
+  unauthenticated: ["bad", "未认证"] };
+async function renderLog() {
+  const sec = $("#tab-log");
+  const filter = h("input", { type: "search", placeholder: "按用户 / 工具 / 内容筛选" });
+  const onlyBad = h("input", { type: "checkbox" });
+  const tbody = h("tbody", {});
+  const { events } = await api("GET", "/api/log?limit=500");
+  function draw() {
+    const q = filter.value.trim().toLowerCase();
+    const list = events.filter(e => {
+      const bad = e.event === "auth_failed" || ["denied", "rate_limited", "error", "unauthenticated"].includes(e.outcome);
+      if (onlyBad.checked && !bad) return false;
+      return !q || JSON.stringify(e).toLowerCase().includes(q);
+    });
+    tbody.replaceChildren(...list.slice(0, 300).map(e => {
+      let what, result;
+      if (e.event === "tool_call") {
+        what = h("span", {}, h("b", { text: e.tool }), " ", h("span", { class: "mono muted" }, JSON.stringify(e.args || {})));
+        const [cls, label] = OUTCOME[e.outcome] || ["off", e.outcome];
+        result = h("span", { class: "tag " + cls }, label + (e.count !== undefined && e.outcome === "ok" ? ` · ${e.count}` : ""));
+      } else if (e.event === "auth_failed") {
+        what = h("span", { class: "muted" }, "token " + (e.reason === "missing_token" ? "缺失" : "无效"));
+        result = h("span", { class: "tag bad" }, "认证失败");
+      } else if (e.event === "admin") {
+        what = h("span", {}, "管理操作：", h("b", { text: e.action }), " ", e.target || "");
+        result = h("span", { class: "tag off" }, "管理");
+      } else {
+        what = h("span", { class: "muted" }, e.event + " " + (e.error || ""));
+        result = h("span", { class: "tag bad" }, e.event);
+      }
+      return h("tr", {}, h("td", { class: "mono" }, (e.ts || "").replace("T", " ").slice(0, 19)),
+        h("td", {}, e.user || h("span", { class: "muted" }, "—")), h("td", { class: "mono hide-sm" }, e.ip || ""),
+        h("td", {}, what), h("td", {}, result), h("td", { class: "hide-sm muted" }, e.ms !== undefined ? e.ms + " ms" : ""));
+    }));
+  }
+  filter.addEventListener("input", draw); onlyBad.addEventListener("change", draw);
+  sec.replaceChildren(
+    h("div", { class: "toolbar" }, filter, h("label", {}, onlyBad, " 只看异常"), h("div", { class: "grow" }),
+      h("button", { class: "btn", onclick: guard(renderLog) }, "刷新")),
+    h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "时间"), h("th", {}, "用户"), h("th", { class: "hide-sm" }, "IP"),
+      h("th", {}, "操作"), h("th", {}, "结果"), h("th", { class: "hide-sm" }, "耗时"))), tbody));
+  draw();
+}
+
+// ---------------------------------------------------------------- tabs & boot
+for (const b of document.querySelectorAll("nav button")) {
+  b.addEventListener("click", guard(async () => {
+    document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", x === b));
+    for (const t of ["users", "scopes", "log"]) $("#tab-" + t).hidden = t !== b.dataset.tab;
+    if (b.dataset.tab === "log") await renderLog();
+  }));
+}
+$("#copy-url").addEventListener("click", () => copy(S.mcp_url || ""));
+
+(async () => {
+  if (!KEY) {
+    $("#banners").replaceChildren(h("div", { class: "banner err" },
+      "缺少管理口令。请用服务启动时打印的管理页面链接打开，或运行：python -m wiki_mcp admin-url --open"));
+    return;
+  }
+  try { await refresh(); }
+  catch (e) { $("#banners").replaceChildren(h("div", { class: "banner err" }, e.message)); }
+})();
+</script>
+</body>
+</html>
