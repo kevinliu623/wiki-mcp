@@ -5,6 +5,21 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-10
+
+Docker 部署。
+
+### 新增
+- 镜像发布到 `ghcr.io/kevinliu623/wiki-mcp`（`0.2.0`、`latest`）
+- Docker 部署：`Dockerfile` + `compose.yaml`（开机自启、健康检查、日志轮转）；与本机运行共用 `config.yaml` 与 `data/`
+- 环境变量覆盖：`WIKI_MCP_ROOT`、`WIKI_MCP_HOST`（覆盖后原 `host` 自动加入 `allowed_hosts`）、`WIKI_MCP_RESCAN_INTERVAL`、`WIKI_MCP_ADMIN_BIND`（仅允许 `127.0.0.1` / 容器内 `0.0.0.0`）
+- 配置项 `rescan_interval`（目录重扫间隔，默认 2 秒）
+- 访问日志同时打印到控制台（`docker compose logs` 可见）
+
+### 变更
+- 运行时状态建议统一放在 `data/`（`access_file: data/tokens.yaml`、`log_file: data/logs/access.jsonl`）；旧配置写法仍然有效
+- 启动日志显示同事访问地址（而非监听地址）；关闭 uvicorn 逐请求日志，由访问日志代替
+
 ## [0.1.0] - 2026-11-06
 
 首个可用版本：只读、按 token 授权的知识库 MCP 服务。
@@ -21,5 +36,6 @@
 - 本机管理页面（`127.0.0.1:8766`）：新建同事、按目录授权、停用 / 重置 token / 删除、以某人身份预览、访问记录，一键复制接入说明
 - Windows 启动脚本 `start.bat`、`admin.bat`
 
-[Unreleased]: https://github.com/kevinliu623/wiki-mcp/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/kevinliu623/wiki-mcp/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/kevinliu623/wiki-mcp/releases/tag/v0.2.0
 [0.1.0]: https://github.com/kevinliu623/wiki-mcp/releases/tag/v0.1.0

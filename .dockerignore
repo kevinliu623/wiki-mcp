@@ -1,0 +1,7 @@
+# 只需要 pyproject.toml / README.md / LICENSE / wiki_mcp/，其余一律不进构建上下文
+*
+!pyproject.toml
+!README.md
+!LICENSE
+!wiki_mcp/
+wiki_mcp/**/__pycache__

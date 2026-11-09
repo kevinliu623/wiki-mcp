@@ -1,0 +1,28 @@
+# docker compose up -d --build     启动（改代码后同样用它重建）
+# docker compose logs -f           看日志（每次查询都会打印一行访问记录）
+# docker compose down              停止
+#
+# 先复制 .env.example 为 .env，填好 WIKI_VAULT。
+# config.yaml 与本机运行共用：容器自动把 root 换成 /vault、监听 0.0.0.0，
+# config.yaml 里的 host 仍是同事访问的地址。端口两侧必须一致（Host 校验带端口）：
+#   8765 = config.yaml 的 port，8766 = admin_port。
+services:
+  wiki-mcp:
+    build: .
+    image: ${WIKI_MCP_IMAGE:-wiki-mcp:local}   # 用发布的镜像：WIKI_MCP_IMAGE=ghcr.io/kevinliu623/wiki-mcp:0.2.0
+    container_name: wiki-mcp
+    restart: unless-stopped
+    ports:
+      - "${WIKI_MCP_PUBLISH:-8765}:8765"   # MCP，对同事开放
+      - "127.0.0.1:8766:8766"              # 管理页面，只发布到本机回环
+    volumes:
+      - "${WIKI_VAULT:?请在 .env 中设置 WIKI_VAULT（知识库根目录）}:/vault:ro"
+      - ./config.yaml:/srv/wiki-mcp/config.yaml:ro
+      - ./data:/srv/wiki-mcp/data
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      # Windows/macOS 的目录挂载很慢（扫描一次约 1 秒），默认 2 秒重扫太频繁；笔记改动最多 30 秒后可见
+      WIKI_MCP_RESCAN_INTERVAL: ${WIKI_MCP_RESCAN_INTERVAL:-30}
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

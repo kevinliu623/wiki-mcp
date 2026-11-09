@@ -64,7 +64,7 @@ class WikiService:
         cfg: Config,
         backend: Backend,
         *,
-        rescan_interval: float = 2.0,
+        rescan_interval: float | None = None,
         clock: Callable[[], float] = time.time,
     ):
         self.cfg = cfg
@@ -72,7 +72,7 @@ class WikiService:
         self.exclude = ExcludeMatcher(cfg.exclude)
         self.gate = Gate(self.exclude, cfg.share_field)
         self.frozen = [segments(p) for p in cfg.frozen]
-        self.rescan_interval = rescan_interval
+        self.rescan_interval = cfg.rescan_interval if rescan_interval is None else rescan_interval
         self.clock = clock
         self._lock = threading.RLock()
         self._snap: _Snapshot | None = None

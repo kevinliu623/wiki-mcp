@@ -30,10 +30,12 @@ python -m venv .venv && .venv/Scripts/pip install -e ".[dev]"   # Windows 下用
 - **管理页面**（`admin.py` + `admin_page.html`）：`serve` 在守护线程里另起一个 uvicorn，**硬编码只监听 127.0.0.1**（`admin_port`，默认 8766）。`/api/*` 需 `X-Admin-Key` 头（防 CSRF）+ Host 校验；口令存 `tokens.yaml` 同目录的 `.admin_key`。`AccessEditor` 读→改→用 `parse_access` 校验→原子替换写回 `tokens.yaml`→`AccessStore.reload()`，所以页面与手改文件共用一套格式（代价：页面保存会丢手写注释）。按目录授权时复用"恰好只含该目录"的现有 scope，否则新建以文件夹名（去日期前缀）命名的 scope。页面是单个 HTML、无构建步骤，CSP 用每次请求的 nonce：**不要写内联 `style=`/`onclick=`**，DOM 一律经 `h()` 构造、文本走 `textContent`。
 - **后端插件**（`backends/base.py`）：`scan / read_text / parse_meta / find_links / is_doc_target / resolve`。`markdown` 处理相对 `[x](a.md)` 链接；`obsidian` 继承它并加 `[[wikilink]]`/`![[embed]]`（按标题或路径后缀解析，同目录优先，再取最短路径）。新类型（Logseq 等）加一个后端，不动核心。
 
+- **部署**：`Dockerfile` + `compose.yaml`。容器靠环境变量适配同一份 `config.yaml`（`config.apply_env_overrides`：`WIKI_MCP_ROOT`/`HOST`/`RESCAN_INTERVAL`；`admin.admin_bind`：`WIKI_MCP_ADMIN_BIND`）。`data/` 必须按**目录**挂载——`AccessEditor` 用 `os.replace` 原子替换 tokens.yaml，单文件 bind mount 会失败。uvicorn 用 `log_config=None`、`access_log=False`：所有输出走 `serve()` 里的同一个 logging 配置，逐请求日志由访问日志（`audit.py`，同时写文件和控制台）代替。
+
 ## 测试
 
 `tests/conftest.py` 构造一个含各类受限内容的 fixture vault（personal、日报、模板、wiki 汇总层、`share: false`、跨 scope 链接、代码块）和 alice/bob/owner 三个用户；新增可见性相关功能时，在这里补对应的"越权不可见"断言。`test_server_e2e.py` 起真实 uvicorn + MCP 客户端走 HTTP。
 
 ## 不入库的文件
 
-`config.yaml`、`tokens.yaml`、`.admin_key`、`certs/`、`logs/`、`onboarding-local.*` 已在 .gitignore 中。示例配置只用占位 hash 与示例路径。
+`config.yaml`、`.env`、`data/`（tokens.yaml、.admin_key、logs）、`certs/`、`onboarding-local.*` 已在 .gitignore 中。示例配置只用占位 hash 与示例路径。
