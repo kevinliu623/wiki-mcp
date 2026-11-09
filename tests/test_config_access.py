@@ -25,6 +25,44 @@ def test_config_paths_relative_to_config_file(cfg, env):
     assert cfg.access_file == (env / "tokens.yaml").resolve()
 
 
+def test_env_overrides_for_container(env, monkeypatch):
+    """Docker: same config.yaml, vault mounted elsewhere, listen on all interfaces."""
+    (env / "config.yaml").write_text("root: E:/somewhere/else\nhost: 10.0.0.5\n", encoding="utf-8")
+    monkeypatch.setenv("WIKI_MCP_ROOT", str(env / "vault"))
+    monkeypatch.setenv("WIKI_MCP_HOST", "0.0.0.0")
+    cfg = load_config(env / "config.yaml")
+    assert cfg.root == env / "vault"
+    assert cfg.host == "0.0.0.0"
+    assert cfg.allowed_hosts == ["10.0.0.5"]          # the colleague-facing address stays allowed
+    assert cfg.public_url == "http://10.0.0.5:8765/mcp"
+
+
+def test_env_override_keeps_existing_allowed_hosts(env, monkeypatch):
+    (env / "config.yaml").write_text("root: vault\nhost: 10.0.0.5\nallowed_hosts: [wiki.lan, 10.0.0.5]\n",
+                                     encoding="utf-8")
+    monkeypatch.setenv("WIKI_MCP_HOST", "0.0.0.0")
+    cfg = load_config(env / "config.yaml")
+    assert cfg.allowed_hosts == ["wiki.lan", "10.0.0.5"]
+
+
+def test_rescan_interval_config_and_env(env, monkeypatch):
+    (env / "config.yaml").write_text("root: vault\nrescan_interval: 5\n", encoding="utf-8")
+    assert load_config(env / "config.yaml").rescan_interval == 5.0
+    monkeypatch.setenv("WIKI_MCP_RESCAN_INTERVAL", "30")
+    assert load_config(env / "config.yaml").rescan_interval == 30.0
+    monkeypatch.setenv("WIKI_MCP_RESCAN_INTERVAL", "soon")
+    with pytest.raises(ConfigError, match="WIKI_MCP_RESCAN_INTERVAL"):
+        load_config(env / "config.yaml")
+
+
+def test_admin_bind_only_loopback_or_container():
+    from wiki_mcp.admin import AdminError, admin_bind
+    assert admin_bind({}) == "127.0.0.1"
+    assert admin_bind({"WIKI_MCP_ADMIN_BIND": "0.0.0.0"}) == "0.0.0.0"
+    with pytest.raises(AdminError):
+        admin_bind({"WIKI_MCP_ADMIN_BIND": "10.0.0.5"})
+
+
 def test_authenticate(cfg):
     store = AccessStore(cfg.access_file)
     assert store.authenticate(ALICE_TOKEN).name == "alice"

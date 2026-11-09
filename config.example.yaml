@@ -17,8 +17,10 @@ allowed_hosts: []
 # tls_certfile: certs/server.crt
 # tls_keyfile: certs/server.key
 
-access_file: tokens.yaml
-log_file: logs/access.jsonl
+# 运行时状态统一放在 data/（不入库）：tokens.yaml、.admin_key（与 tokens.yaml 同目录）、访问日志。
+# Docker 部署时整个 data/ 读写挂载进容器，本机运行与容器共用这一份。
+access_file: data/tokens.yaml
+log_file: data/logs/access.jsonl
 
 # 硬排除：优先于任何授权，写错 tokens.yaml 也看不到。
 #   不含 "/" 的条目：匹配任意层级的同名目录/文件（如 _templates）
@@ -39,6 +41,10 @@ share_field: share     # 写 share: false 的笔记对所有人隐藏
 
 # 每个用户每分钟的工具调用上限
 rate_limit_per_minute: 60
+
+# 目录重扫间隔（秒）。本机磁盘扫描只要几毫秒，默认 2 秒即可；
+# Docker on Windows/macOS 的目录挂载慢，compose.yaml 已用 WIKI_MCP_RESCAN_INTERVAL=30 覆盖。
+# rescan_interval: 2
 
 # 本机管理页面端口（始终只监听 127.0.0.1，同事访问不到）；0 表示不启用
 admin_port: 8766

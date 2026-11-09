@@ -4,7 +4,11 @@ Security model (this page can change permissions, so it is the most
 sensitive surface of the project):
 
 * always bound to 127.0.0.1, on its own port — colleagues only ever reach the
-  read-only MCP listener;
+  read-only MCP listener. The one exception is a container
+  (``WIKI_MCP_ADMIN_BIND=0.0.0.0``, set by the Dockerfile): loopback inside a
+  container is unreachable from the host, so it binds the container interface
+  and the compose file publishes the port on the *host's* 127.0.0.1 only. The
+  Host check below still only accepts 127.0.0.1 / localhost;
 * every ``/api`` call needs the admin key in the ``X-Admin-Key`` header. A
   custom header cannot be sent cross-origin without a CORS preflight (which we
   never grant), so a malicious web page in the local browser cannot drive the
@@ -37,6 +41,16 @@ from .paths import norm
 from .policy import Policy
 
 ADMIN_HOST = "127.0.0.1"
+ENV_ADMIN_BIND = "WIKI_MCP_ADMIN_BIND"
+_ADMIN_BINDS = ("127.0.0.1", "0.0.0.0")
+
+
+def admin_bind(environ=None) -> str:
+    """Interface the admin server listens on (see module docstring)."""
+    value = (os.environ if environ is None else environ).get(ENV_ADMIN_BIND) or ADMIN_HOST
+    if value not in _ADMIN_BINDS:
+        raise AdminError(f"{ENV_ADMIN_BIND} 只能是 {' 或 '.join(_ADMIN_BINDS)}（容器内用 0.0.0.0），当前：{value!r}")
+    return value
 _HEADER = (
     "# 访问控制（不入库）。由管理页面维护，也可以手动编辑，保存即生效。\n"
     "# 注意：管理页面保存时会重写本文件，手写的注释不会保留。\n"
@@ -456,8 +470,9 @@ def start_admin_thread(c, key: str) -> threading.Thread:
     """Run the admin page in a daemon thread (the MCP server owns the main thread)."""
     import uvicorn
 
-    server = uvicorn.Server(uvicorn.Config(build_admin_app(c, key), host=ADMIN_HOST,
-                                           port=c.cfg.admin_port, log_level="warning"))
+    server = uvicorn.Server(uvicorn.Config(build_admin_app(c, key), host=admin_bind(),
+                                           port=c.cfg.admin_port, log_level="warning",
+                                           log_config=None, access_log=False))
     t = threading.Thread(target=server.run, name="wiki-mcp-admin", daemon=True)
     t.start()
     return t

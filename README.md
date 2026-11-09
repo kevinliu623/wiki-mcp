@@ -54,7 +54,7 @@ python -m venv .venv
 
 # 2. 配置
 cp config.example.yaml config.yaml      # 改 root、exclude、host
-cp tokens.example.yaml tokens.yaml      # 定义 scopes
+mkdir data && cp tokens.example.yaml data/tokens.yaml   # 定义 scopes（运行时状态都在 data/，不入库）
 
 # 3. 启动（Windows 可直接运行 start.bat）
 python -m wiki_mcp serve --open          # --open：同时在浏览器打开管理页面
@@ -69,7 +69,7 @@ python -m wiki_mcp serve --open          # --open：同时在浏览器打开管�
 
 忘了链接：双击 `admin.bat`，或运行 `python -m wiki_mcp admin-url --open`。
 
-也可以不用页面，直接编辑 `tokens.yaml` 或用命令行：
+也可以不用页面，直接编辑 `data/tokens.yaml` 或用命令行：
 
 ```bash
 python -m wiki_mcp token-new 张三 --scopes 技术公共,项目A   # 输出 token 和要粘进 tokens.yaml 的片段
@@ -91,6 +91,26 @@ python -m wiki_mcp preview 张三 --search "部署"             # 以张三身�
 }
 ```
 
+### Docker 部署（推荐长期运行）
+
+容器开机自启、崩溃自动重启，在 Docker Desktop 里能直接看到运行状态和日志。与本机运行共用同一份 `config.yaml` 和 `data/`：
+
+```bash
+cp .env.example .env              # 填 WIKI_VAULT=知识库根目录
+docker compose up -d --build      # 启动 / 改代码后重建
+docker compose logs -f            # 每次查询、鉴权失败、管理操作各打印一行
+docker compose down               # 停止
+```
+
+不想本地构建：在 `.env` 里加 `WIKI_MCP_IMAGE=ghcr.io/kevinliu623/wiki-mcp:0.2.0`，然后 `docker compose pull && docker compose up -d`。
+
+- 知识库只读挂载到容器的 `/vault`，`config.yaml` 只读挂载，`data/`（tokens、管理口令、访问日志）读写挂载
+- 容器内自动把 `root` 换成 `/vault`、监听 `0.0.0.0`；`config.yaml` 里写的 `host` 仍是同事访问的地址（自动加入 `allowed_hosts`）
+- 管理页面端口只发布到宿主机 `127.0.0.1:8766`，链接照旧（`admin.bat` 也照常可用）
+- 容器与 `start.bat` 不要同时运行（端口冲突）
+- Windows/macOS 上目录挂载较慢（扫描一次约 1 秒），compose 把重扫间隔设为 30 秒：笔记改动最多 30 秒后可见
+- 已知限制：Docker Desktop 的端口转发不保留来源 IP，访问日志里的 `ip` 都是容器网关地址；按 token 记录的**用户名不受影响**
+
 ## 安全模型
 
 - **default-deny**：token 没授权的目录，读、搜、列、最近修改、关联笔记全部不可见
@@ -99,7 +119,7 @@ python -m wiki_mcp preview 张三 --search "部署"             # 以张三身�
 - **传输**：默认只监听 `127.0.0.1`；监听 `0.0.0.0` 必须配置 `allowed_hosts`；开启 Host/Origin 校验防 DNS rebinding；明文 HTTP 对外时启动告警，建议配置 `tls_certfile/tls_keyfile` 或置于 HTTPS 反向代理之后
 - **凭据**：`tokens.yaml` 只存 sha256；`config.yaml`、`tokens.yaml`、日志均不入库
 - **限频与审计**：每用户每分钟调用上限；所有调用、鉴权失败与管理操作写访问日志（不记录明文 token）
-- **管理页面**：只监听 `127.0.0.1`、独立端口；所有接口需要 `X-Admin-Key` 请求头（跨站网页无法伪造，防 CSRF），校验 Host 头；严格 CSP；口令保存在 `tokens.yaml` 旁的 `.admin_key`（不入库）
+- **管理页面**：只监听 `127.0.0.1`（容器内监听容器网卡，但只发布到宿主机 `127.0.0.1`）、独立端口；所有接口需要 `X-Admin-Key` 请求头（跨站网页无法伪造，防 CSRF），校验 Host 头；严格 CSP；口令保存在 `tokens.yaml` 旁的 `.admin_key`（不入库）
 - **已知边界**：只隐藏*链接*，不隐藏正文里的普通文字提及（包括代码块里的文字）；附件（图片/PDF）不提供，但附件链接文字保持原样
 
 ## 开发
@@ -115,6 +135,7 @@ python -m wiki_mcp preview 张三 --search "部署"             # 以张三身�
 ## Roadmap
 
 - [x] v0.1 只读查询：4 个工具、scope 权限、链接脱敏、热加载、审计、限频、本机管理页面
+- [x] v0.2 Docker 部署（镜像 `ghcr.io/kevinliu623/wiki-mcp`）
 - [ ] 需求投递（按项目收件箱 + 定时扫描确认，见 design.md D1）
 - [ ] wiki 汇总层按页面 `projects:` 字段授权
 - [ ] 更多后端：Logseq、思源笔记

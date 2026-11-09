@@ -196,7 +196,7 @@ def serve(cfg: Config, open_admin: bool = False) -> None:
     n_users = len(c.access.table().users)
     logger.info("wiki-mcp %s · backend=%s · root=%s · %d 篇可索引笔记 · %d 个有效用户",
                 __version__, cfg.backend, cfg.root, n_docs, n_users)
-    logger.info("MCP 地址：%s://%s:%d/mcp", cfg.scheme, cfg.host, cfg.port)
+    logger.info("MCP 地址：%s（监听 %s:%d）", cfg.public_url, cfg.host, cfg.port)
     if cfg.scheme == "http" and cfg.host not in ("127.0.0.1", "localhost", "::1"):
         logger.warning("正在用明文 HTTP 对外提供服务：token 在网络上可被嗅探。建议配置 tls_certfile/tls_keyfile 或置于 HTTPS 反向代理之后。")
     if cfg.admin_port:
@@ -213,4 +213,6 @@ def serve(cfg: Config, open_admin: bool = False) -> None:
         ssl_certfile=str(cfg.tls_certfile) if cfg.tls_certfile else None,
         ssl_keyfile=str(cfg.tls_keyfile) if cfg.tls_keyfile else None,
         log_level="info",
+        log_config=None,          # use the logging set up above: one format for all console / `docker logs` lines
+        access_log=False,         # the audit line (user, tool, outcome) replaces per-request noise
     )

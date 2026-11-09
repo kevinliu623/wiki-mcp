@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import time
 from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger("wiki_mcp.access")
 
 
 class AccessLog:
@@ -23,6 +26,7 @@ class AccessLog:
         line = json.dumps(record, ensure_ascii=False)
         with self._lock, open(self.path, "a", encoding="utf-8") as f:
             f.write(line + "\n")
+        logger.info(line)                 # also on the console / `docker logs`
 
 
 def summarize_args(args: dict[str, Any], max_len: int = 200) -> dict[str, Any]:

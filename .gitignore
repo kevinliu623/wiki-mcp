@@ -3,6 +3,8 @@ tokens.yaml
 tokens.yaml.tmp
 .admin_key
 config.yaml
+.env
+data/
 certs/
 access_log*.jsonl
 logs/

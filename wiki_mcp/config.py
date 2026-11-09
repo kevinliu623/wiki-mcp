@@ -9,9 +9,10 @@ must fail loudly instead of being silently ignored.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 import yaml
 
@@ -51,7 +52,8 @@ class Config:
     status_field: str = "status"
     share_field: str = "share"
     rate_limit_per_minute: int = 60
-    admin_port: int = 8766           # local admin page, always bound to 127.0.0.1; 0 disables
+    rescan_interval: float = 2.0     # seconds between directory rescans (raise it on slow mounts, e.g. Docker on Windows)
+    admin_port: int = 8766           # local admin page (127.0.0.1 only, see admin.py); 0 disables
     limits: Limits = field(default_factory=Limits)
 
     @property
@@ -115,11 +117,43 @@ def load_config(path: str | Path) -> Config:
     cfg.exclude = [str(x) for x in (cfg.exclude or [])]
     cfg.frozen = [norm(str(x)) for x in (cfg.frozen or [])]
     cfg.allowed_hosts = [str(x) for x in (cfg.allowed_hosts or [])]
+    apply_env_overrides(cfg)
     cfg.port = int(cfg.port)
     cfg.rate_limit_per_minute = int(cfg.rate_limit_per_minute)
     cfg.admin_port = int(cfg.admin_port)
+    cfg.rescan_interval = float(cfg.rescan_interval)
     validate(cfg)
     return cfg
+
+
+ENV_ROOT = "WIKI_MCP_ROOT"
+ENV_HOST = "WIKI_MCP_HOST"
+ENV_RESCAN = "WIKI_MCP_RESCAN_INTERVAL"
+_WILDCARD = ("0.0.0.0", "::")
+
+
+def apply_env_overrides(cfg: Config, environ: Mapping[str, str] | None = None) -> None:
+    """Deployment overrides, used by the Docker image.
+
+    The same config.yaml then works both on the host and in a container: the
+    container mounts the knowledge base elsewhere (``WIKI_MCP_ROOT=/vault``)
+    and must listen on all interfaces (``WIKI_MCP_HOST=0.0.0.0``). The host
+    written in config.yaml is still the address colleagues use, so it is kept
+    as the first allowed Host (and therefore as :attr:`Config.public_url`).
+    """
+    env = os.environ if environ is None else environ
+    if env.get(ENV_ROOT):
+        cfg.root = Path(env[ENV_ROOT])
+    host = env.get(ENV_HOST)
+    if host and host != cfg.host:
+        if cfg.host not in _WILDCARD and cfg.host not in cfg.allowed_hosts:
+            cfg.allowed_hosts.insert(0, cfg.host)
+        cfg.host = host
+    if env.get(ENV_RESCAN):
+        try:
+            cfg.rescan_interval = float(env[ENV_RESCAN])
+        except ValueError:
+            raise ConfigError(f"{ENV_RESCAN} 必须是秒数，当前：{env[ENV_RESCAN]!r}") from None
 
 
 def validate(cfg: Config) -> None:
@@ -131,13 +165,15 @@ def validate(cfg: Config) -> None:
         raise ConfigError(f"backend 必须是 {sorted(BACKENDS)} 之一，当前：{cfg.backend!r}")
     if bool(cfg.tls_certfile) != bool(cfg.tls_keyfile):
         raise ConfigError("tls_certfile 与 tls_keyfile 必须同时配置")
-    if cfg.host in ("0.0.0.0", "::") and not cfg.allowed_hosts:
+    if cfg.host in _WILDCARD and not cfg.allowed_hosts:
         raise ConfigError(
             "监听所有网卡（0.0.0.0 / ::）时必须配置 allowed_hosts（同事访问时使用的 IP 或域名），"
             "否则无法做 Host 校验。建议改为监听具体的内网 IP。"
         )
     if cfg.admin_port and (cfg.admin_port == cfg.port or not 0 < cfg.admin_port < 65536):
         raise ConfigError("admin_port 必须是 1–65535 且不同于 port（0 表示不启用管理页面）")
+    if cfg.rescan_interval < 0:
+        raise ConfigError("rescan_interval 不能为负数")
     if cfg.rate_limit_per_minute <= 0:
         raise ConfigError("rate_limit_per_minute 必须为正数")
     for f in fields(Limits):
