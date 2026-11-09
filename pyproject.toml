@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wiki-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "Turn a personal Obsidian / Markdown knowledge base into a read-only, permission-scoped MCP service."
 readme = "README.md"
 license = { text = "MIT" }
